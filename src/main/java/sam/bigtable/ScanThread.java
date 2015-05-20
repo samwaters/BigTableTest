@@ -14,6 +14,12 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 
+/**
+ * Worker thread to perform scan operations on the cluster
+ * @author Sam Waters <sam@samwaters.com>
+ * @date 20-05-2015
+ *
+ */
 public class ScanThread extends Thread
 {
 	private boolean _canRun;
@@ -23,12 +29,20 @@ public class ScanThread extends Thread
 	private Table _table;
 	private String _threadName;
 	
+	/**
+	 * Set up the connection to BigTable
+	 * @param threadName Unique name for the thread
+	 * @param tableName Table to use on the cluster
+	 * @param scanStart Scan start value
+	 * @param scanEnd Scan end value
+	 */
 	public ScanThread(String threadName, String tableName, int scanStart, int scanEnd)
 	{
 		try
 		{
 			this._canRun = true;
 			System.out.println("Thread " + threadName + " connecting...");
+			//Connect to BigTable
 			this._connection  = ConnectionFactory.createConnection();
 			this._table = this._connection.getTable(TableName.valueOf(tableName));
 		}
@@ -42,34 +56,46 @@ public class ScanThread extends Thread
 		this._scanEnd = scanEnd;
 	}
 	
+	/**
+	 * Perform scan operation(s)
+	 */
 	public void run()
 	{
 		if(!this._canRun)
 		{
 			return;
 		}
+		//Build a new scanner
 		Scan scan = new Scan();
+		//col1 >= value
+		//TODO: Use values passed in
 		scan.setFilter(new SingleColumnValueFilter("cf".getBytes(), "col1".getBytes(), CompareFilter.CompareOp.GREATER_OR_EQUAL, "value".getBytes()));
 		try
 		{
+			//Perform the scan operation
 			ResultScanner resultScanner = this._table.getScanner(scan);
 			for(Result result : resultScanner)
 			{
+				//Print the result
                 this.printResult(result);
 			}
 		}
 		catch(IOException e) {}
 	}
 	
+	/**
+	 * Print details of a result from the scan operation
+	 * @param result The result from the scan operation
+	 */
 	public void printResult(Result result)
 	{
 		for (Cell cell : result.listCells())
 		{
-            String row = new String(CellUtil.cloneRow(cell));
-            String family = new String(CellUtil.cloneFamily(cell));
-            String column = new String(CellUtil.cloneQualifier(cell));
-            String value = new String(CellUtil.cloneValue(cell));
-            long timestamp = cell.getTimestamp();
+            String row = new String(CellUtil.cloneRow(cell)); //Row key
+            String family = new String(CellUtil.cloneFamily(cell)); //Column family
+            String column = new String(CellUtil.cloneQualifier(cell)); //Column name
+            String value = new String(CellUtil.cloneValue(cell)); //Value
+            long timestamp = cell.getTimestamp(); //Last updated
             System.out.printf("Row: " + row + ", Family: " + family + ", Column: " + column + ", Timestamp: " + timestamp + ", Value: " + value);
         }
 	}
